@@ -1,9 +1,9 @@
-const TgApi = require('node-telegram-bot-api')
+const TelegramApi = require('node-telegram-bot-api')
 const { options, again } = require('./options')
 
 const token = '7690931384:AAGifnBInN4x4FoP6BK8npPAGoaZA80RZ2E'
 
-const bot = new TgApi(token, { polling: true });
+const bot = new TelegramApi(token, { polling: true });
 
 const chats = {};
 
