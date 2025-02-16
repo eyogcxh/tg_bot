@@ -1,5 +1,7 @@
 const TelegramApi = require('node-telegram-bot-api')
 const { options, again } = require('./options')
+const sequelize = require('./db')
+const UserModel = require('./models')
 
 const token = '7690931384:AAGifnBInN4x4FoP6BK8npPAGoaZA80RZ2E'
 
@@ -14,7 +16,15 @@ const startGame = async (chatId) => {
   await bot.sendMessage(chatId, 'game test', options);
 };
 
-const start = () => {
+const start = async () => {
+
+  try {
+    await sequelize.authenticate()
+    await sequelize.sync()
+  } catch (err) {
+      console.error('Conection error', err)
+  }
+
   bot.setMyCommands([
     { command: '/start', description: 'Приветствие' },
     { command: '/info', description: 'Информация о боте' },
@@ -25,23 +35,29 @@ const start = () => {
     const text = msg.text;
     const chatId = msg.chat.id;
 
-    if (text === '/start') {
-      return bot.sendMessage(chatId, `Hello ${msg.from.first_name}`);
+    try {
+      if (text === '/start') {
+        await UserModel.create({ chatId })
+        return bot.sendMessage(chatId, `Hello ${msg.from.first_name}`);
+      }
+      if (text === '/info') {
+        const user = await UserModel.findOne({ chatId })
+        return bot.sendMessage(chatId, `Кол-во правильных овтветов ${user.rightAnswers}, кол-во неправильных ответов ${user.worngAnswers}`);
+      }
+      if (text === '/start_test') {
+        return startGame(chatId);
+      }
+  
+      return bot.sendMessage(chatId, 'Я тебя не понимаю');
+    } catch (err) {
+      return bot.sendMessage(chatId, 'Ошибка на сервевре. Уже идут ремонтные работы')
     }
-    if (text === '/info') {
-      return bot.sendMessage(chatId, 'info text');
-    }
-    if (text === '/start_test') {
-      return startGame(chatId);
-    }
-
-    return bot.sendMessage(chatId, 'Я тебя не понимаю');
   });
 
   bot.on('callback_query', async query => {
     const data = query.data;
     const chatId = query.message.chat.id;
-
+    const user = await UserModel.findOne({ chatId })
     await bot.answerCallbackQuery(query.id);
 
     if (data === 'again') {
@@ -49,9 +65,11 @@ const start = () => {
     }
 
     if (data === chats[chatId]) {
-      return bot.sendMessage(chatId, `Молодец, ты отгадал цифру ${chats[chatId]}! 🎉`, again);
+      user.rightAnswers += 1
+      await bot.sendMessage(chatId, `Молодец, ты отгадал цифру ${chats[chatId]}! 🎉`, again);
     } else {
-      return bot.sendMessage(chatId, `Ты не угадал 😔 Загадана цифра ${chats[chatId]}.`, again);
+      user.worngAnswers += 1
+      await bot.sendMessage(chatId, `Ты не угадал 😔 Загадана цифра ${chats[chatId]}.`, again);
     }
   });
 };
